@@ -146,7 +146,7 @@ def main():
   env = env_builder.build_imitation_env(motion_files=[args.motion_file],
                                         num_parallel_envs=num_procs,
                                         mode=args.mode,
-                                        enable_randomizer=enable_env_rand,
+                                        enable_randomizer=False,
                                         enable_rendering=args.visualize)
   
   model = build_model(env=env,
