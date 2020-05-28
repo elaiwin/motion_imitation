@@ -89,9 +89,8 @@ class SimpleTG(object):
 
     def _genertate_trajectory(self, alpha_tg, Ae, Cs, t_p, h_leg, theta, z):
         x = Cs + alpha_tg * np.cos(t_p)
-        y = h_tg + Ae * np.sin(t_p) + theta * np.cos(t_p)
+        y = h_leg + Ae * np.sin(t_p) + theta * np.cos(t_p)
         return np.array([x, y, z])
-
 
 
     def get_trajectory(self , phi_t):
