@@ -24,25 +24,17 @@ from gym import spaces
 import numpy as np
 
 from robots import laikago_pose_utils
-from robots import minitaur_pose_utils
 
-import SimpleTG from simple_TG
+from simple_TG import SimpleTG
 
 class SimpleTGGroup(object):
   """A trajectory generator that return constant motor angles."""
 
   def __init__(
-      self,
+      self, init_lg_param,
       init_abduction=laikago_pose_utils.LAIKAGO_DEFAULT_ABDUCTION_ANGLE,
       init_hip=laikago_pose_utils.LAIKAGO_DEFAULT_HIP_ANGLE,
       init_knee=laikago_pose_utils.LAIKAGO_DEFAULT_KNEE_ANGLE,
-      init_phi_leg = 0, init_alpha_tg = 0, init_Ae = 0, init_Cs = 0,
-        init_t_p = 0,
-        init_theta = 0,
-        init_z = 0,
-        init_h_tg = 0,
-       init_k_sle = 0,
-        init_f_tg = 0,
       action_limit=0.5,
       ):
     """Initializes the controller."""
@@ -64,29 +56,23 @@ class SimpleTGGroup(object):
     # action_high = np.array([action_limit] * 12)
     # self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
-    f_tg = 0
+    assert init_lg_param.size is 1+9*4
+
 
     self._time = 0
     self._phi_t = 0
-    self._f_tg = f_tg
+    self._f_tg = self.unpack_params(init_lg_param)
 
-    fl_tg = SimpleTG(phi_leg  = init_phi_leg, alpha_tg = init_alpha_tg ,
-                     Ae = init_Ae, Cs  = init_Cs, t_p = init_t_p, theta = init_theta,
-                     z = init_z, h_tg = init_h_tg, k_sle = init_k_sle , f_tg = init_f_tg )
 
-    fr_tg = SimpleTG(phi_leg  = init_phi_leg, alpha_tg = init_alpha_tg ,
-                     Ae = init_Ae, Cs  = init_Cs, t_p = init_t_p, theta = init_theta,
-                     z = init_z, h_tg = init_h_tg, k_sle = init_k_sle , f_tg = init_f_tg )
+    fl_tg = SimpleTG(init_params = self.unpack_params(init_lg_param , 0) , upstream_params= self.unpack_params(init_lg_param))
 
-    bl_tg = SimpleTG(phi_leg  = init_phi_leg, alpha_tg = init_alpha_tg ,
-                     Ae = init_Ae, Cs  = init_Cs, t_p = init_t_p, theta = init_theta,
-                     z = init_z, h_tg = init_h_tg, k_sle = init_k_sle , f_tg = init_f_tg )
+    fr_tg = SimpleTG(init_params = self.unpack_params(init_lg_param , 1) , upstream_params= self.unpack_params(init_lg_param))
 
-    br_tg = SimpleTG(phi_leg  = init_phi_leg, alpha_tg = init_alpha_tg ,
-                     Ae = init_Ae, Cs  = init_Cs, t_p = init_t_p, theta = init_theta,
-                     z = init_z, h_tg = init_h_tg, k_sle = init_k_sle , f_tg = init_f_tg )
+    rl_tg = SimpleTG(init_params = self.unpack_params(init_lg_param , 2) , upstream_params= self.unpack_params(init_lg_param))
 
-    self._tg = [fl_tg , fr_tg , bl_tg , br_tg]
+    rr_tg = SimpleTG(init_params = self.unpack_params(init_lg_param , 3) , upstream_params= self.unpack_params(init_lg_param))
+
+    self._tg = [fl_tg , fr_tg , rl_tg , rr_tg]
 
   def reset(self):
     pass
@@ -106,28 +92,50 @@ class SimpleTGGroup(object):
 
     Args:
       current_time: The time in gym env since reset.
-      input_action: A numpy array. The input leg pose and trajectory parameters from a NN controller.
+      input_action: A numpy array. The input [leg pose]  and [trajectory parameters} from a NN controller.
 
     Returns:
       A numpy array. The desired motor angles.
     """
+
+    # either get the current time to update or get time increment
+    # probably the former
     self._time = current_time
     self._update_phi_t(self._f_tg , current_time = current_time)
 
     num_joint = 12
     num_joint_in_leg = 3
-    temp_pose = np.array([num_joint])
 
+    tg_pose = np.array([num_joint])
+
+    # retrieve from TG
+    input_param = input_action[num_joint:]
     for leg_num in range(len(self._tg)):
-        temp_pose[leg_num*num_joint_in_leg : (leg_num+1)*num_joint_in_leg] =  \
+        self._tg[leg_num].unpack_params(self.unpack_params(params=input_param, key=leg_num))
+        tg_pose[leg_num*num_joint_in_leg : (leg_num+1)*num_joint_in_leg] =  \
             self._tg[leg_num].get_trajectory(self._phi_t)
 
 
 
-
-    return self._pose + input_action
+    return self._pose + input_action[:num_joint] + tg_pose
 
   def get_observation(self, input_observation):
     """Get the trajectory generator's observation."""
 
     return input_observation
+
+  def unpack_params(self, params , key=-1):
+
+      num_shared = 1
+      num_indie = 9
+
+      if key == -1:
+          return params[:num_shared]
+      elif key == 0:
+          return params[num_shared:(num_shared+num_indie)]
+      elif key == 1:
+          return params[(num_shared+num_indie):(num_shared+num_indie*2)]
+      elif key == 2:
+          return params[(num_shared+num_indie*2):(num_shared+num_indie*3)]
+      elif key == 3:
+          return params[(num_shared+num_indie*3):]

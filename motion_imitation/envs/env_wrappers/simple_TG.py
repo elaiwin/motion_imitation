@@ -28,33 +28,24 @@ class SimpleTG(object):
     """A trajectory generator that return constant motor angles."""
 
     def __init__(
-            self , phi_leg , delta_phi , alpha_tg , Ae , Cs , t_p, theta, z , h_tg, k_sle , phi_t , f_tg , beta
+            self , init_params, upstream_params
     ):
 
         # We will need this I think
         # self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
-        ##################################3
+        ##################################
         # tunable parameters
-
-        self._alpha_tg = alpha_tg
-        self._Ae = Ae
-        self._Cs = Cs
-        self._theta = theta
-        self._z = z
-        self._h_tg = h_tg
-        self._k_sle = k_sle
-        self._delta_phi = delta_phi
-        self._beta = beta
-
-        # from upstream untunable
-        self._phi_t = phi_t
-        self._phi_leg = phi_leg
-        self._t_p = t_p
-
+        # phi_leg, delta_phi, alpha_tg, Ae, Cs, t_p, theta, z, h_tg, k_sle, phi_t, f_tg, beta
+        self.unpack_params(init_params)
 
         # upstream tunable
-        self._f_tg = f_tg
+        self._f_tg = upstream_params[0]
+
+        # from upstream untunable
+        self._phi_t = upstream_params[1]
+        self._phi_leg = upstream_params[2]
+        self._t_p = upstream_params[3]
 
 
     def reset(self):
@@ -92,6 +83,16 @@ class SimpleTG(object):
         y = h_leg + Ae * np.sin(t_p) + theta * np.cos(t_p)
         return np.array([x, y, z])
 
+    def unpack_params(self , params):
+        self._alpha_tg = params[0]
+        self._Ae = params[1]
+        self._Cs = params[2]
+        self._theta = params[3]
+        self._z = params[4]
+        self._h_tg = params[5]
+        self._k_sle = params[6]
+        self._delta_phi = params[7]
+        self._beta = params[8]
 
     def get_trajectory(self , phi_t):
         self._sync_phi_t(phi_t = phi_t)
